@@ -87,9 +87,12 @@ class SplunkMCPClient:
             logger.info(f"Connected to Splunk instance: {server_name}")
             self._connected = True
         except Exception as e:
-            logger.warning(f"Failed to connect to Splunk: {e}. Falling back to demo mode.")
-            self.demo_mode = True
-            self._connected = True
+            logger.error(f"CRITICAL: Failed to connect to live Splunk instance: {e}")
+            raise RuntimeError(
+                f"Failed to connect to live Splunk instance at {self.base_url}. "
+                f"Please verify your SPLUNK_TOKEN, SPLUNK_HOST, and SPLUNK_PORT in your .env file. "
+                f"Error details: {e}"
+            ) from e
 
     async def disconnect(self) -> None:
         """Close the HTTP client."""
