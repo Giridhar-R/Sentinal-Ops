@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SentinelOps — Autonomous Incident Command for Splunk. Multi-agent AI system for real-time incident response.">
+    <title>SentinelOps — War Room</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+</head>
+<body>
+    <div class="app-container" id="app">
+
+        <!-- ============ HEADER ============ -->
+        <header class="header" id="header">
+            <div class="header-left">
+                <div class="logo">
+                    <div class="logo-icon">🛡️</div>
+                    <span class="logo-text">Sentinel<span class="logo-accent">Ops</span></span>
+                </div>
+            </div>
+            <div class="header-center">
+                <div class="incident-badge" id="incident-badge">
+                    <span>⏳</span>
+                    <span id="incident-id">No Active Incident</span>
+                </div>
+                <div class="severity-badge hidden" id="severity-badge">—</div>
+
+                <!-- SAIA Call Counter — Most important panel for judges -->
+                <div class="saia-counter hidden" id="saia-counter">
+                    <div class="saia-counter-item saia-purple">
+                        <span class="saia-label">SAIA</span>
+                        <span class="saia-value" id="saia-call-count">0</span>
+                    </div>
+                    <div class="saia-counter-item">
+                        <span class="saia-label">SPL</span>
+                        <span class="saia-value" id="spl-query-count">0</span>
+                    </div>
+                    <div class="saia-counter-item">
+                        <span class="saia-label">Saved</span>
+                        <span class="saia-value" id="saved-search-count">0</span>
+                    </div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="timer" id="incident-timer">00:00</div>
+                <div class="connection-status">
+                    <div class="status-dot" id="ws-status-dot"></div>
+                    <span id="ws-status-text">Connecting...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- ============ WAR ROOM ============ -->
+        <div class="war-room hidden" id="war-room">
+
+            <!-- LEFT COLUMN — Agent Status -->
+            <div class="glass-panel agents-panel" id="agents-panel">
+                <div class="panel-header">
+                    <div class="panel-title"><span class="icon">🤖</span> Agents</div>
+                    <div class="panel-badge" id="agents-active-count">0 active</div>
+                </div>
+                <div class="panel-body" id="agents-list">
+                    <!-- Agent cards — CLICKABLE for detail modal -->
+                    <div class="agent-card idle clickable" id="agent-orchestrator" data-agent="orchestrator" onclick="openAgentDetail('orchestrator')">
+                        <div class="agent-card-header">
+                            <span class="agent-name">🎯 Orchestrator</span>
+                            <span class="agent-status-badge idle" id="status-orchestrator">Idle</span>
+                        </div>
+                        <div class="agent-detail" id="detail-orchestrator">Waiting for incident trigger</div>
+                        <div class="agent-spl" id="spl-orchestrator"></div>
+                        <div class="agent-progress"><div class="agent-progress-bar" id="progress-orchestrator"></div></div>
+                        <div class="agent-click-hint">Click for details →</div>
+                    </div>
+
+                    <div class="agent-card idle clickable" id="agent-threat_hunter" data-agent="threat_hunter" onclick="openAgentDetail('threat_hunter')">
+                        <div class="agent-card-header">
+                            <span class="agent-name">🔍 Threat Hunter</span>
+                            <span class="agent-status-badge idle" id="status-threat_hunter">Idle</span>
+                        </div>
+                        <div class="agent-detail" id="detail-threat_hunter">IOC search & MITRE mapping</div>
+                        <div class="agent-spl" id="spl-threat_hunter"></div>
+                        <div class="agent-progress"><div class="agent-progress-bar" id="progress-threat_hunter"></div></div>
+                        <div class="agent-click-hint">Click for details →</div>
+                    </div>
+
+                    <div class="agent-card idle clickable" id="agent-rca_agent" data-agent="rca_agent" onclick="openAgentDetail('rca_agent')">
+                        <div class="agent-card-header">
+                            <span class="agent-name">🔬 RCA Agent</span>
+                            <span class="agent-status-badge idle" id="status-rca_agent">Idle</span>
+                        </div>
+                        <div class="agent-detail" id="detail-rca_agent">Root cause analysis</div>
+                        <div class="agent-spl" id="spl-rca_agent"></div>
+                        <div class="agent-progress"><div class="agent-progress-bar" id="progress-rca_agent"></div></div>
+                        <div class="agent-click-hint">Click for details →</div>
+                    </div>
+
+                    <div class="agent-card idle clickable" id="agent-blast_radius" data-agent="blast_radius" onclick="openAgentDetail('blast_radius')">
+                        <div class="agent-card-header">
+                            <span class="agent-name">💥 Blast Radius</span>
+                            <span class="agent-status-badge idle" id="status-blast_radius">Idle</span>
+                        </div>
+                        <div class="agent-detail" id="detail-blast_radius">Impact scoping</div>
+                        <div class="agent-spl" id="spl-blast_radius"></div>
+                        <div class="agent-progress"><div class="agent-progress-bar" id="progress-blast_radius"></div></div>
+                        <div class="agent-click-hint">Click for details →</div>
+                    </div>
+
+                    <div class="agent-card idle clickable" id="agent-remediation" data-agent="remediation" onclick="openAgentDetail('remediation')">
+                        <div class="agent-card-header">
+                            <span class="agent-name">🛠️ Remediation</span>
+                            <span class="agent-status-badge idle" id="status-remediation">Idle</span>
+                        </div>
+                        <div class="agent-detail" id="detail-remediation">Runbook & action planning</div>
+                        <div class="agent-spl" id="spl-remediation"></div>
+                        <div class="agent-progress"><div class="agent-progress-bar" id="progress-remediation"></div></div>
+                        <div class="agent-click-hint">Click for details →</div>
+                    </div>
+                </div>
+
+                <!-- Execution Log -->
+                <div class="panel-header log-header">
+                    <div class="panel-title"><span class="icon">📋</span> Activity Log</div>
+                </div>
+                <div class="panel-body log-panel-body" id="execution-log">
+                    <!-- Log entries rendered by JS -->
+                </div>
+            </div>
+
+            <!-- CENTER COLUMN -->
+            <div class="center-column" id="center-column">
+                <!-- Evidence Board -->
+                <div class="glass-panel evidence-panel" id="evidence-panel">
+                    <div class="panel-header">
+                        <div class="panel-title"><span class="icon">📊</span> Evidence Board</div>
+                        <div class="panel-badge" id="evidence-count">0</div>
+                    </div>
+                    <div class="panel-body" id="evidence-list">
+                        <div class="text-muted" style="text-align:center; padding: 30px; font-size: 0.82rem;">
+                            Agents are gathering evidence...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Incident Timeline -->
+                <div class="glass-panel timeline-panel" id="timeline-panel">
+                    <div class="panel-header">
+                        <div class="panel-title"><span class="icon">⏱️</span> Incident Timeline</div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="timeline" id="timeline-container">
+                            <!-- Timeline events rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN -->
+            <div class="right-column" id="right-column">
+                <!-- Recommendations / Actions -->
+                <div class="glass-panel recommendation-panel" id="recommendation-panel">
+                    <div class="panel-header">
+                        <div class="panel-title"><span class="icon">⚡</span> Recommended Actions</div>
+                    </div>
+                    <div class="panel-body" id="actions-list">
+                        <div class="text-muted" style="text-align:center; padding: 20px; font-size: 0.82rem;">
+                            Awaiting remediation plan...
+                        </div>
+                    </div>
+                    <div class="approval-buttons hidden" id="approval-buttons">
+                        <button class="btn btn-approve" id="btn-approve" onclick="approveIncident('approved')">
+                            ✅ Approve All
+                        </button>
+                        <button class="btn btn-escalate" id="btn-escalate" onclick="approveIncident('escalated')">
+                            ⬆️ Escalate
+                        </button>
+                        <button class="btn btn-override" id="btn-override" onclick="approveIncident('overridden')">
+                            ✋ Override
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Chat -->
+                <div class="glass-panel chat-panel" id="chat-panel">
+                    <div class="panel-header">
+                        <div class="panel-title"><span class="icon">💬</span> War Room Chat</div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="chat-messages" id="chat-messages">
+                            <div class="chat-message system">
+                                Ask questions about the active incident. Powered by <span class="saia-tag">saia_ask_splunk_question</span>
+                            </div>
+                        </div>
+                        <div class="chat-input-row">
+                            <input type="text" class="chat-input" id="chat-input"
+                                   placeholder="Ask about IOCs, timeline, blast radius..."
+                                   onkeydown="if(event.key==='Enter') sendChatMessage()">
+                            <button class="chat-send" id="chat-send" onclick="sendChatMessage()">
+                                ➤
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ WELCOME SCREEN ============ -->
+        <div class="war-room" id="welcome-container">
+            <div class="welcome-screen" id="welcome-screen">
+                <div class="welcome-icon">🛡️</div>
+                <h1 class="welcome-title">SentinelOps War Room</h1>
+                <p class="welcome-subtitle">
+                    Autonomous Incident Command for Splunk. Multi-agent AI system built on the Splunk MCP Server & AI Assistant.
+                </p>
+                <div class="welcome-features">
+                    <div class="feature-chip">🔍 Threat Hunter</div>
+                    <div class="feature-chip">🔬 Root Cause</div>
+                    <div class="feature-chip">💥 Blast Radius</div>
+                    <div class="feature-chip">🛠️ Remediation</div>
+                    <div class="feature-chip">📄 Auto Post-Mortem</div>
+                </div>
+                <button class="btn btn-demo" id="btn-trigger-demo" onclick="triggerDemo()">
+                    🚀 Launch Demo Incident
+                </button>
+                <p class="text-muted" style="font-size: 0.72rem; margin-top: 10px;">
+                    Real-time Splunk Enterprise data · SAIA + MCP tools · MITRE ATT&CK mapping
+                </p>
+            </div>
+        </div>
+
+        <!-- ============ AGENT DETAIL MODAL ============ -->
+        <div class="modal-overlay hidden" id="agent-detail-modal">
+            <div class="modal-container glass-panel">
+                <div class="modal-header">
+                    <div class="modal-title" id="modal-agent-title">Agent Details</div>
+                    <button class="modal-close" onclick="closeAgentDetail()">✕</button>
+                </div>
+                <div class="modal-body" id="modal-agent-body">
+                    <!-- Dynamic content rendered by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ POST-MORTEM OVERLAY ============ -->
+        <div class="modal-overlay hidden" id="postmortem-panel">
+            <div class="modal-container glass-panel postmortem-modal">
+                <div class="modal-header">
+                    <div class="modal-title"><span class="icon">📋</span> Auto Post-Mortem Report</div>
+                    <button class="modal-close" onclick="closePostmortem()">✕</button>
+                </div>
+                <div class="postmortem-content" id="postmortem-content">
+                    <!-- Rendered markdown -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JavaScript Modules -->
+    <script src="/static/js/websocket.js"></script>
+    <script src="/static/js/agent-status.js"></script>
+    <script src="/static/js/evidence-board.js"></script>
+    <script src="/static/js/timeline.js"></script>
+    <script src="/static/js/chat.js"></script>
+    <script src="/static/js/postmortem.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

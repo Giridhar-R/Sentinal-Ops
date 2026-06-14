@@ -1,0 +1,106 @@
+# SentinelOps — Docker Compose Stack
+# Full stack: FastAPI backend, Nginx traffic gen, Splunk UF
+#
+# Usage:
+#   docker-compose up -d
+#   docker-compose logs -f backend
+#
+# Environment variables (set in .env or export):
+#   SPLUNK_BASE_URL=https://your-splunk:8089
+#   SPLUNK_TOKEN=your-bearer-token
+#   DEMO_MODE=true
+
+version: "3.9"
+
+services:
+
+  # ====================
+  # FastAPI Backend
+  # ====================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - SENTINEL_HOST=0.0.0.0
+      - SENTINEL_PORT=8000
+      - SENTINEL_DEMO_MODE=${DEMO_MODE:-true}
+      - SENTINEL_SPLUNK_BASE_URL=${SPLUNK_BASE_URL:-https://localhost:8089}
+      - SENTINEL_SPLUNK_TOKEN=${SPLUNK_TOKEN:-}
+      - SENTINEL_SPLUNK_MCP_MODE=sse
+      - SENTINEL_SPLUNK_INDEX=sentinalops_os
+      - SENTINEL_LLM_PROVIDER=gemini
+      - SENTINEL_LLM_MODEL=gemini-2.0-flash
+      - SENTINEL_LOG_LEVEL=INFO
+    volumes:
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ====================
+  # Nginx — Web traffic generator
+  # Produces access logs that Splunk ingests
+  # ====================
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/html:/usr/share/nginx/html:ro
+      - ./logs/nginx:/var/log/nginx
+    restart: unless-stopped
+
+  # ====================
+  # Traffic Generator — sends requests to Nginx
+  # Generates both normal and suspicious patterns
+  # ====================
+  traffic-gen:
+    image: alpine:latest
+    depends_on:
+      - nginx
+    entrypoint: /bin/sh
+    command: >
+      -c "
+        apk add --no-cache curl;
+        while true; do
+          # Normal traffic
+          curl -s http://nginx/ > /dev/null;
+          curl -s http://nginx/api/v1/status > /dev/null;
+          # Occasional suspicious requests
+          if [ $$(( RANDOM % 10 )) -eq 0 ]; then
+            curl -s http://nginx/.env > /dev/null;
+            curl -s http://nginx/admin/login > /dev/null;
+          fi;
+          sleep $$(( RANDOM % 3 + 1 ));
+        done
+      "
+    restart: unless-stopped
+
+  # ====================
+  # Anomaly Injector — generates attack logs
+  # ====================
+  anomaly-injector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: python
+    command: >
+      demo/anomaly_injector.py --output /app/logs/attack.log --type all --count 200
+    volumes:
+      - ./logs:/app/logs
+    profiles:
+      - demo  # Only runs when: docker-compose --profile demo up anomaly-injector
+
+networks:
+  default:
+    name: sentinelops-net
