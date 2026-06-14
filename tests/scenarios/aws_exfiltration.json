@@ -1,0 +1,89 @@
+{
+  "scenario_id": "TEST-AWS-EXFIL-001",
+  "scenario_name": "AWS S3 Data Exfiltration via Compromised IAM Credentials",
+  "description": "Simulates an attacker who has obtained stolen IAM credentials and is staging large-scale data exfiltration from S3 buckets to an external endpoint.",
+  "alert": {
+    "alert_id": "ALERT-AWS-2025-0312",
+    "alert_name": "AWS S3 Bulk Download — Anomalous IAM Activity",
+    "alert_severity": "critical",
+    "alert_raw": {
+      "source_ip": "198.51.100.77",
+      "aws_account_id": "123456789012",
+      "iam_user": "svc-data-pipeline",
+      "region": "us-east-1",
+      "index": "sentinalops_os",
+      "event_type": "aws_s3_exfiltration",
+      "s3_buckets_accessed": [
+        "prod-customer-data",
+        "prod-financial-reports",
+        "prod-pii-archive"
+      ],
+      "total_bytes_downloaded": 2147483648,
+      "download_duration_minutes": 18,
+      "api_calls": [
+        "s3:GetObject",
+        "s3:ListBucket",
+        "sts:GetCallerIdentity",
+        "iam:ListAccessKeys"
+      ],
+      "anomaly_indicators": [
+        "First API call from this IP address",
+        "Download volume 340x above 30-day baseline",
+        "3 sensitive buckets accessed in rapid succession",
+        "sts:GetCallerIdentity called — credential validation pattern"
+      ],
+      "targeted_accounts": ["svc-data-pipeline"],
+      "failed_count": 0,
+      "success_count": 847
+    }
+  },
+  "expected_blast_radius": {
+    "compromised_entities": [
+      {"type": "iam_user", "name": "svc-data-pipeline", "risk_score": 0.98},
+      {"type": "s3_bucket", "name": "prod-customer-data", "risk_score": 0.95},
+      {"type": "s3_bucket", "name": "prod-financial-reports", "risk_score": 0.92},
+      {"type": "s3_bucket", "name": "prod-pii-archive", "risk_score": 0.97}
+    ],
+    "potentially_affected_entities": [
+      {"type": "iam_role", "name": "DataPipelineExecutionRole", "risk_score": 0.75},
+      {"type": "ec2_instance", "name": "i-0abc123def456", "risk_score": 0.60},
+      {"type": "lambda_function", "name": "etl-processor", "risk_score": 0.55}
+    ],
+    "total_entity_count": 7,
+    "compromised_count": 4,
+    "business_impact": "CRITICAL — 2GB of customer PII, financial reports, and archived sensitive data potentially exfiltrated to external endpoint"
+  },
+  "expected_mitre_techniques": [
+    "T1078.004 — Valid Accounts: Cloud Accounts",
+    "T1530 — Data from Cloud Storage",
+    "T1537 — Transfer Data to Cloud Account",
+    "T1087.004 — Account Discovery: Cloud Account"
+  ],
+  "expected_remediation_actions": [
+    {
+      "priority": 1,
+      "title": "Deactivate compromised IAM access keys",
+      "requires_approval": true
+    },
+    {
+      "priority": 1,
+      "title": "Block source IP 198.51.100.77 in AWS WAF and Security Groups",
+      "requires_approval": true
+    },
+    {
+      "priority": 2,
+      "title": "Enable S3 bucket versioning and object lock on affected buckets",
+      "requires_approval": false
+    },
+    {
+      "priority": 2,
+      "title": "Rotate all IAM credentials for svc-data-pipeline",
+      "requires_approval": true
+    },
+    {
+      "priority": 3,
+      "title": "Audit CloudTrail logs for additional compromised sessions",
+      "requires_approval": false
+    }
+  ]
+}

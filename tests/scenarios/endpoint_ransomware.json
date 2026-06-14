@@ -1,0 +1,108 @@
+{
+  "scenario_id": "TEST-RANSOM-001",
+  "scenario_name": "Endpoint Ransomware Deployment via Lateral Movement",
+  "description": "Simulates a ransomware attack that begins with a phishing-compromised endpoint and propagates laterally via SMB and PsExec to encrypt file shares and database servers.",
+  "alert": {
+    "alert_id": "ALERT-RANSOM-2025-0519",
+    "alert_name": "Ransomware Indicators — Mass File Encryption Detected",
+    "alert_severity": "critical",
+    "alert_raw": {
+      "source_ip": "10.10.50.22",
+      "initial_host": "ws-marketing-07",
+      "index": "sentinalops_os",
+      "event_type": "endpoint_ransomware",
+      "infected_hosts": [
+        "ws-marketing-07",
+        "fs-shared-01",
+        "fs-shared-02",
+        "app-srv-02"
+      ],
+      "encryption_indicators": [
+        "vssadmin delete shadows /all /quiet",
+        "bcdedit /set {default} recoveryenabled no",
+        "wmic shadowcopy delete",
+        ".encrypted file extension on 12,847 files"
+      ],
+      "lateral_movement_methods": [
+        "SMB (TCP 445) — ws-marketing-07 → fs-shared-01",
+        "PsExec — fs-shared-01 → fs-shared-02",
+        "WMI — fs-shared-02 → app-srv-02"
+      ],
+      "ransom_note_filename": "RECOVER-FILES.txt",
+      "bitcoin_wallet": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+      "files_encrypted_count": 12847,
+      "total_encrypted_size_gb": 156.3,
+      "targeted_accounts": ["admin-mkt", "svc_backup"],
+      "failed_count": 3,
+      "success_count": 4
+    }
+  },
+  "expected_blast_radius": {
+    "compromised_entities": [
+      {"type": "host", "name": "ws-marketing-07", "risk_score": 0.99},
+      {"type": "host", "name": "fs-shared-01", "risk_score": 0.98},
+      {"type": "host", "name": "fs-shared-02", "risk_score": 0.97},
+      {"type": "host", "name": "app-srv-02", "risk_score": 0.95},
+      {"type": "user", "name": "admin-mkt", "risk_score": 0.96},
+      {"type": "user", "name": "svc_backup", "risk_score": 0.90},
+      {"type": "data_store", "name": "marketing-fileshare", "risk_score": 0.99},
+      {"type": "data_store", "name": "engineering-fileshare", "risk_score": 0.95}
+    ],
+    "potentially_affected_entities": [
+      {"type": "host", "name": "dc-01", "risk_score": 0.72},
+      {"type": "host", "name": "db-srv-01", "risk_score": 0.68},
+      {"type": "service", "name": "api-backend", "risk_score": 0.65},
+      {"type": "service", "name": "backup-agent", "risk_score": 0.80},
+      {"type": "data_store", "name": "customer_database", "risk_score": 0.60}
+    ],
+    "total_entity_count": 13,
+    "compromised_count": 8,
+    "business_impact": "CRITICAL — 156GB of data encrypted across 4 hosts, file shares inaccessible, application server compromised, backup agent at risk of encryption"
+  },
+  "expected_mitre_techniques": [
+    "T1486 — Data Encrypted for Impact",
+    "T1490 — Inhibit System Recovery",
+    "T1021.002 — Remote Services: SMB/Windows Admin Shares",
+    "T1569.002 — System Services: Service Execution (PsExec)",
+    "T1047 — Windows Management Instrumentation",
+    "T1566.001 — Phishing: Spearphishing Attachment",
+    "T1078 — Valid Accounts"
+  ],
+  "expected_remediation_actions": [
+    {
+      "priority": 1,
+      "title": "Isolate all infected hosts from the network immediately",
+      "requires_approval": true
+    },
+    {
+      "priority": 1,
+      "title": "Block SMB (TCP 445) lateral movement at network segmentation points",
+      "requires_approval": true
+    },
+    {
+      "priority": 1,
+      "title": "Disable compromised accounts admin-mkt and svc_backup",
+      "requires_approval": true
+    },
+    {
+      "priority": 2,
+      "title": "Verify backup integrity — check backup-agent status on backup-srv-01",
+      "requires_approval": false
+    },
+    {
+      "priority": 2,
+      "title": "Deploy EDR containment policy to all endpoints in the marketing subnet",
+      "requires_approval": true
+    },
+    {
+      "priority": 3,
+      "title": "Preserve forensic images of ws-marketing-07 (patient zero)",
+      "requires_approval": false
+    },
+    {
+      "priority": 4,
+      "title": "Begin restoration from last known clean backup after containment confirmed",
+      "requires_approval": true
+    }
+  ]
+}
